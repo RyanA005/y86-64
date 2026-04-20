@@ -90,7 +90,7 @@ void print_cpu(cpu *c) {
     printf("000 :");
     for (int i = 0; i < c->regs[rsp]; i++) {
         printf(" %02x", (unsigned char) c->mem[i]);
-        if (!((i + 1) % 8)) printf("\n%03x :", i);
+        if (!((i + 1) % 8)) printf("\n%03x :", i + 1);
     }
     printf("\n\n");
 }

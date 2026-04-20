@@ -43,6 +43,22 @@ int main(int argc, char **argv) {
             if (i == 0) continue; // comment or empty line
 
             if (buf[strlen(buf)-1] == ':') { buf[strlen(buf)-1] = '\0'; push_label(buf, m); } // label (ends in :)
+            if(!strcmp(buf, ".pos")) {
+                get_tok(buf, f); 
+                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
+                else num = strtol(buf, NULL, 10);
+                m = num; // literally move pointer to where we write next bytes
+            }
+            if(!strcmp(buf, ".align")) {
+                get_tok(buf, f); // should be number
+                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
+                else num = strtol(buf, NULL, 10);
+                while(m % num != 0) m++; // increment until multiple of num
+            }
+            if(!strcmp(buf, ".byte")) m += 1;
+            else if(!strcmp(buf, ".word")) m += 2;
+            else if(!strcmp(buf, ".long")) m += 4;
+            else if(!strcmp(buf, ".quad")) m += 8;
             else if (!strcmp(buf, "halt")) m += 1;
             else if (!strcmp(buf, "nop")) m += 1;
             else if (!strcmp(buf, "rrmovq")) m += 2;
@@ -82,7 +98,7 @@ int main(int argc, char **argv) {
     label_table *temp = head;
     printf("label table: \n");
     while (temp) {
-        printf("%s : %ld\n", temp->name, temp->location);
+        printf("%s : 0x%lx\n", temp->name, temp->location);
         temp = temp->next;
     }
     printf("\n");
@@ -100,6 +116,56 @@ int main(int argc, char **argv) {
             }
             if (i == 0) continue; // comment or empty line
 
+            // pseudo ops
+            if(!strcmp(buf, ".pos")) {
+                get_tok(buf, f); // should be memory location (chosing to omit labels for now...)
+                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
+                else num = strtol(buf, NULL, 10);
+                m = num; // literally move pointer to where we write next bytes
+                printf(".pos %s # %lx\n", buf, num);
+            }
+            if(!strcmp(buf, ".align")) {
+                get_tok(buf, f); // should be number
+                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
+                else num = strtol(buf, NULL, 10);
+                while(m % num != 0) m++; // increment until multiple of num
+                printf(".align %lx\n", num);
+            }
+            if(!strcmp(buf, ".byte")) { // write 1 byte
+                get_tok(buf, f);
+                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
+                else num = strtol(buf, NULL, 10);
+                memcpy(&c.mem[m], (unsigned char *)&num, 1);
+                m ++;
+                printf(".byte %lx\n", num);
+            }
+            if(!strcmp(buf, ".word")) { // write 2
+                get_tok(buf, f);
+                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
+                else num = strtol(buf, NULL, 10);
+                memcpy(&c.mem[m], (unsigned char *)&num, 2);
+                m += 2;
+                printf(".word %lx\n", num);
+            }
+            if(!strcmp(buf, ".long")) { // write 4
+                get_tok(buf, f);
+                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
+                else num = strtol(buf, NULL, 10);
+                memcpy(&c.mem[m], (unsigned char *)&num, 4);
+                m += 4;
+                printf(".long %lx\n", num);
+            }
+            if(!strcmp(buf, ".quad")) { // write 8
+                get_tok(buf, f);
+                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
+                else num = strtol(buf, NULL, 10);
+                memcpy(&c.mem[m], (unsigned char *)&num, 8);
+                m += 8;
+                printf(".quad %lx\n", num);
+            }
+
+
+            // instructions
             if (!strcmp(buf, "halt")) { 
                 c.mem[m++] = (char) (0 << 4) + 0;
                 printf("halt\n");
@@ -211,65 +277,72 @@ int main(int argc, char **argv) {
             else if (!strcmp(buf, "jmp")) {
                 c.mem[m++] = (char) (7 << 4) + 0;
                 get_tok(buf, f);
-                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
+                if (resolve_label(buf) >= 0) num = resolve_label(buf);
+                else if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
                 else num = strtol(buf, NULL, 10);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
-                printf("jmp 0x%lx\n", num);
+                printf("jmp %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "jle")) {
                 c.mem[m++] = (char) (7 << 4) + 1;
                 get_tok(buf, f);
-                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
+                if (resolve_label(buf) >= 0) num = resolve_label(buf);
+                else if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
                 else num = strtol(buf, NULL, 10);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
-                printf("jle 0x%lx\n", num);
+                printf("jle %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "jl")) {
                 c.mem[m++] = (char) (7 << 4) + 2;
                 get_tok(buf, f);
-                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
+                if (resolve_label(buf) >= 0) num = resolve_label(buf);
+                else if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
                 else num = strtol(buf, NULL, 10);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
-                printf("jl 0x%lx\n", num);
+                printf("jl %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "je")) {
                 c.mem[m++] = (char) (7 << 4) + 3;
                 get_tok(buf, f);
-                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
+                if (resolve_label(buf) >= 0) num = resolve_label(buf);
+                else if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
                 else num = strtol(buf, NULL, 10);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
-                printf("je 0x%lx\n", num);
+                printf("je %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "jne")) {
                 c.mem[m++] = (char) (7 << 4) + 4;
                 get_tok(buf, f);
-                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
+                if (resolve_label(buf) >= 0) num = resolve_label(buf);
+                else if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
                 else num = strtol(buf, NULL, 10);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
-                printf("jne 0x%lx\n", num);
+                printf("jne %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "jge")) {
                 c.mem[m++] = (char) (7 << 4) + 5;
                 get_tok(buf, f);
-                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
+                if (resolve_label(buf) >= 0) num = resolve_label(buf);
+                else if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
                 else num = strtol(buf, NULL, 10);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
-                printf("jge 0x%lx\n", num);
+                printf("jge %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "jg")) {
                 c.mem[m++] = (char) (7 << 4) + 6;
                 get_tok(buf, f);
-                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
+                if (resolve_label(buf) >= 0) num = resolve_label(buf);
+                else if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
                 else num = strtol(buf, NULL, 10);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
-                printf("jg 0x%lx\n", num);
+                printf("jg %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "cmovle")) {
                 c.mem[m++] = (char) (2 << 4) + 1;
@@ -335,7 +408,7 @@ int main(int argc, char **argv) {
                 else num = strtol(buf, NULL, 10);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
-                printf("call %s # 0x%ld\n", buf, num);
+                printf("call %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "ret")) {
                 c.mem[m++] = (char) (9 << 4) + 0;

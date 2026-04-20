@@ -1,6 +1,12 @@
 # simple test program
 
+.pos 5
+
 main:
+
+.align 0x4
+
+.byte 0xff
 
 irmovq $10, %rax
 irmovq $20, %rbx
