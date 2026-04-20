@@ -1,5 +1,7 @@
 # simple test program
 
+main:
+
 irmovq $10, %rax
 irmovq $20, %rbx
 
@@ -9,6 +11,8 @@ andq %rax, %rbx
 xorq %rax, %rbx
 
 # memory test
+
+function:
 
 irmovq $0x100, %rcx
 rmmovq %rax, 0(%rcx)
@@ -20,6 +24,8 @@ pushq %rax
 pushq %rbx
 popq %rsi
 popq %rdi
+
+call function
 
 halt
 

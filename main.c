@@ -23,11 +23,13 @@ int main(int argc, char **argv) {
 
     // step 1 : turn text into raw opcodes
     
-    long num = 0, off = 0;
-    int i = 0, m = 0, j = 0;
+    long num = 0, off = 0, m = 0;
+    int i = 0, j = 0;
     enum reg a, b;
     char buf[32], buf2[32];
     char ch;
+
+    // first pass to resolve labels
 
     while ((ch = fgetc(f)) != EOF) { // read char by char
 
@@ -40,8 +42,64 @@ int main(int argc, char **argv) {
             }
             if (i == 0) continue; // comment or empty line
 
-            // INSTRUCTION ENCODINGS
-            
+            if (buf[strlen(buf)-1] == ':') { buf[strlen(buf)-1] = '\0'; push_label(buf, m); } // label (ends in :)
+            else if (!strcmp(buf, "halt")) m += 1;
+            else if (!strcmp(buf, "nop")) m += 1;
+            else if (!strcmp(buf, "rrmovq")) m += 2;
+            else if (!strcmp(buf, "irmovq")) m += 10;
+            else if (!strcmp(buf, "rmmovq")) m += 10;
+            else if (!strcmp(buf, "mrmovq")) m += 10;
+            else if (!strcmp(buf, "addq")) m += 2;
+            else if (!strcmp(buf, "subq")) m += 2;
+            else if (!strcmp(buf, "andq")) m += 2;
+            else if (!strcmp(buf, "xorq")) m += 2;
+            else if (!strcmp(buf, "jmp")) m += 9;
+            else if (!strcmp(buf, "jle")) m += 9;
+            else if (!strcmp(buf, "jl")) m += 9;
+            else if (!strcmp(buf, "je")) m += 9;
+            else if (!strcmp(buf, "jne")) m += 9;
+            else if (!strcmp(buf, "jge")) m += 9;
+            else if (!strcmp(buf, "jg")) m += 9;
+            else if (!strcmp(buf, "cmovle")) m += 2;
+            else if (!strcmp(buf, "cmovl")) m += 2;
+            else if (!strcmp(buf, "cmove")) m += 2;
+            else if (!strcmp(buf, "cmovne")) m += 2;
+            else if (!strcmp(buf, "cmovge")) m += 2;
+            else if (!strcmp(buf, "cmovg")) m += 2;
+            else if (!strcmp(buf, "call")) m += 9;
+            else if (!strcmp(buf, "ret")) m += 1;
+            else if (!strcmp(buf, "pushq")) m += 2;
+            else if (!strcmp(buf, "popq")) m += 2;
+
+            i = 0;
+        }
+    }
+    
+    rewind(f);
+    m = 0;
+
+    // print label table
+    label_table *temp = head;
+    printf("label table: \n");
+    while (temp) {
+        printf("%s : %ld\n", temp->name, temp->location);
+        temp = temp->next;
+    }
+    printf("\n");
+
+    // second pass to write bytes
+
+    while ((ch = fgetc(f)) != EOF) { // read char by char
+
+        if (ch != ' ' && ch != '\n') buf[i++] = ch; // fill buffer with single tokens
+        else {
+            buf[i] = '\0';
+            if (*buf == '#') while ((ch = fgetc(f)) != '\n' && ch != EOF) { // skip comments
+                i = 0; 
+                continue;
+            }
+            if (i == 0) continue; // comment or empty line
+
             if (!strcmp(buf, "halt")) { 
                 c.mem[m++] = (char) (0 << 4) + 0;
                 printf("halt\n");
@@ -272,11 +330,12 @@ int main(int argc, char **argv) {
             else if (!strcmp(buf, "call")) {
                 c.mem[m++] = (char) (8 << 4) + 0;
                 get_tok(buf, f);
-                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
+                if (resolve_label(buf) >= 0) num = resolve_label(buf);
+                else if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
                 else num = strtol(buf, NULL, 10);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
-                printf("call 0x%lx\n", num);
+                printf("call %s # 0x%ld\n", buf, num);
             }
             else if (!strcmp(buf, "ret")) {
                 c.mem[m++] = (char) (9 << 4) + 0;
@@ -302,6 +361,12 @@ int main(int argc, char **argv) {
     }
 
     fclose(f);
+
+    // step 2 - execute instructions
+
+    for (i = 0; i < MEMSIZE; i++) {
+        
+    }
 
     print_cpu(&c);
 

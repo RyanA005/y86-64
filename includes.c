@@ -17,6 +17,15 @@ typedef struct {
     char stat;
 } cpu;
 
+
+typedef struct {
+    long location; // index into cpu->mem
+    char *name;
+    void *next;
+} label_table;
+
+label_table *head;
+
 // helpers
 
 void init_cpu(cpu *c) { // init entire CPU to 0
@@ -67,7 +76,7 @@ char *get_reg_name(enum reg r) {
 }
 
 void print_cpu(cpu *c) {
-    printf("pc : %lx\n\n", c->pc);
+    printf("\npc : %lx\n\n", c->pc);
     printf("registers:\n");
     for (int i = 0; i < 4; i++) {
         printf("%4s : %4lx", get_reg_name(i), c->regs[i]);
@@ -92,3 +101,20 @@ void get_tok(char *buf, FILE *f) {
     buf[i] = '\0';
 }
 
+void push_label(char *name, long location) {
+    label_table *new = malloc(sizeof(label_table));
+    new->name = strdup(name);
+    new->location = location;
+    new->next = head;
+    head = new;
+}
+
+long resolve_label(char *name) {
+    label_table *temp = head;
+    while (temp) { 
+        if (!strcmp(name, temp->name)) {
+            return temp->location;
+        }
+        temp = temp->next;
+    } return -1;
+}
