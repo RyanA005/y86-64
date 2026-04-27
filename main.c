@@ -18,6 +18,8 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
+    // init cpu stuct 
+
     cpu c;
     init_cpu(&c);
 
@@ -43,19 +45,15 @@ int main(int argc, char **argv) {
             if (i == 0) continue; // comment or empty line
 
             if (buf[strlen(buf)-1] == ':') { buf[strlen(buf)-1] = '\0'; push_label(buf, m); } // label (ends in :)
-            if(!strcmp(buf, ".pos")) {
-                get_tok(buf, f); 
-                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
-                else num = strtol(buf, NULL, 10);
+            else if(!strcmp(buf, ".pos")) {
+                get_value(buf, f, &num);
                 m = num; // literally move pointer to where we write next bytes
             }
-            if(!strcmp(buf, ".align")) {
-                get_tok(buf, f); // should be number
-                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
-                else num = strtol(buf, NULL, 10);
+            else if(!strcmp(buf, ".align")) {
+                get_value(buf, f, &num);
                 while(m % num != 0) m++; // increment until multiple of num
             }
-            if(!strcmp(buf, ".byte")) m += 1;
+            else if(!strcmp(buf, ".byte")) m += 1;
             else if(!strcmp(buf, ".word")) m += 2;
             else if(!strcmp(buf, ".long")) m += 4;
             else if(!strcmp(buf, ".quad")) m += 8;
@@ -116,49 +114,39 @@ int main(int argc, char **argv) {
             }
             if (i == 0) continue; // comment or empty line
 
+            printf("0x%-4lx : ", m);
+
             // pseudo ops
             if(!strcmp(buf, ".pos")) {
-                get_tok(buf, f); // should be memory location (chosing to omit labels for now...)
-                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
-                else num = strtol(buf, NULL, 10);
+                get_value(buf, f, &num);
                 m = num; // literally move pointer to where we write next bytes
                 printf(".pos %s # %lx\n", buf, num);
             }
             if(!strcmp(buf, ".align")) {
-                get_tok(buf, f); // should be number
-                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
-                else num = strtol(buf, NULL, 10);
+                get_value(buf, f, &num);
                 while(m % num != 0) m++; // increment until multiple of num
                 printf(".align %lx\n", num);
             }
             if(!strcmp(buf, ".byte")) { // write 1 byte
-                get_tok(buf, f);
-                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
-                else num = strtol(buf, NULL, 10);
+                get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 1);
-                m ++;
+                m += 1;
                 printf(".byte %lx\n", num);
             }
             if(!strcmp(buf, ".word")) { // write 2
-                get_tok(buf, f);
-                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
-                else num = strtol(buf, NULL, 10);
+                get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 2);
                 m += 2;
                 printf(".word %lx\n", num);
             }
             if(!strcmp(buf, ".long")) { // write 4
-                get_tok(buf, f);
-                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
-                else num = strtol(buf, NULL, 10);
+                get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 4);
                 m += 4;
                 printf(".long %lx\n", num);
             }
             if(!strcmp(buf, ".quad")) { // write 8
-                get_tok(buf, f);
-                if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
-                else num = strtol(buf, NULL, 10);
+                get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
                 printf(".quad %lx\n", num);
@@ -166,6 +154,7 @@ int main(int argc, char **argv) {
 
 
             // instructions
+
             if (!strcmp(buf, "halt")) { 
                 c.mem[m++] = (char) (0 << 4) + 0;
                 printf("halt\n");
@@ -176,22 +165,19 @@ int main(int argc, char **argv) {
             }
             else if (!strcmp(buf, "rrmovq")) { 
                 c.mem[m++] = (2 << 4) + 0;
-                get_tok(buf, f); // should be a "ra,"
-                buf[strlen(buf) - 1] = '\0'; // remove trailing','
-                a = get_reg(buf);
-                get_tok(buf, f); // should be a "rb"
-                b = get_reg(buf);
-                c.mem[m++] = (a << 4) + b; // write two nibbles
+                get_two_registers(buf, f, &a, &b);
+                c.mem[m++] = (a << 4) + b;
                 printf("rrmovq %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "irmovq")) {
                 c.mem[m++] = (char) (3 << 4) + 0;
                 get_tok(buf, f); // should be "<immediate>,"
                 buf[strlen(buf) - 1] = '\0'; // remove trailing','
-                if(buf[2] == 'x') num = strtol(buf+3, NULL, 16); // remove leading '$0x'
-                else num = strtol(buf+1, NULL, 10); // remove leading '$'
-                get_tok(buf, f); // should be a "rb"
-                b = get_reg(buf);
+                // special case of immediate written first, must remove comma
+                if (resolve_label(buf) >= 0) num = resolve_label(buf);
+                else if(buf[2] == 'x') num = strtol(buf+3, NULL, 16);
+                else num = strtol(buf+1, NULL, 10); 
+                get_second_register(buf, f, &b);
                 c.mem[m++] = (15 << 4) + b; // write two nibbles, first is 'f'
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
@@ -199,213 +185,150 @@ int main(int argc, char **argv) {
             }
             else if (!strcmp(buf, "rmmovq")) { 
                 c.mem[m++] = (char) (4 << 4) + 0;
-                get_tok(buf, f); // should be a "ra,"
-                buf[strlen(buf) - 1] = '\0'; // remove trailing','
-                a = get_reg(buf);
+                get_first_register(buf, f, &a);
                 get_tok(buf, f); // should be a "D(rb)"
                 while (buf[j] != '(') { buf2[j] = buf[j]; j++; }
                 if (j > 0) {
-                    buf2[j] = '\0';
-                    if (buf2[0] == '0' && buf2[1] == 'x') off = strtol(buf2 + 2, NULL, 16);
-                    else off = strtol(buf2, NULL, 10);
+                    if (resolve_label(buf) >= 0) num = resolve_label(buf);
+                    else if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
+                    else num = strtol(buf, NULL, 10);
                 }
                 buf[strlen(buf) - 1] = '\0'; // remove trailing')'
                 b = get_reg(buf+j+1);
-                c.mem[m++] = (a << 4) + b; // write two nibbles
+                c.mem[m++] = (a << 4) + b;
                 memcpy(&c.mem[m], (unsigned char *)&off, 8);
                 m += 8;
                 printf("rmmovq %s, 0x%lx(%s)\n", get_reg_name(a), off, get_reg_name(b));
             }
             else if (!strcmp(buf, "mrmovq")) {
                 c.mem[m++] = (char) (5 << 4) + 0;
-                get_tok(buf, f); // should be a "D(ra)"
+                get_tok(buf, f); // should be a "D(ra),"
                 while (buf[j] != '(') { buf2[j] = buf[j]; j++; }
                 if (j > 0) {
-                    buf2[j] = '\0';
-                    if (buf2[0] == '0' && buf2[1] == 'x') off = strtol(buf2 + 2, NULL, 16);
-                    else off = strtol(buf2, NULL, 10);
+                    if (resolve_label(buf) >= 0) num = resolve_label(buf);
+                    else if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
+                    else num = strtol(buf, NULL, 10);
                 }
                 buf[strlen(buf) - 2] = '\0'; // remove trailing'),'
                 a = get_reg(buf+j+1);
-                get_tok(buf, f); // should be a "rb,"
-                b = get_reg(buf);
-                c.mem[m++] = (a << 4) + b; // write two nibbles
+                get_second_register(buf, f, &b);
+                c.mem[m++] = (a << 4) + b;
                 memcpy(&c.mem[m], (unsigned char *)&off, 8);
                 m += 8;
                 printf("mrmovq 0x%lx(%s), %s\n", off, get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "addq")) {
                 c.mem[m++] = (char) (6 << 4) + 0;
-                get_tok(buf, f); // should be a "ra,"
-                buf[strlen(buf) - 1] = '\0'; // remove trailing','
-                a = get_reg(buf);
-                get_tok(buf, f); // should be a "rb"
-                b = get_reg(buf);
-                c.mem[m++] = (a << 4) + b; // write two nibbles
+                get_two_registers(buf, f, &a, &b);
+                c.mem[m++] = (a << 4) + b;
                 printf("addq %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "subq")) { 
                 c.mem[m++] = (char) (6 << 4) + 1;
-                get_tok(buf, f); // should be a "ra,"
-                buf[strlen(buf) - 1] = '\0'; // remove trailing','
-                a = get_reg(buf);
-                get_tok(buf, f); // should be a "rb"
-                b = get_reg(buf);
-                c.mem[m++] = (a << 4) + b; // write two nibbles
+                get_two_registers(buf, f, &a, &b);
+                c.mem[m++] = (a << 4) + b;
                 printf("subq %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "andq")) {
                 c.mem[m++] = (char) (6 << 4) + 2;
-                get_tok(buf, f); // should be a "ra,"
-                buf[strlen(buf) - 1] = '\0'; // remove trailing','
-                a = get_reg(buf);
-                get_tok(buf, f); // should be a "rb"
-                b = get_reg(buf);
-                c.mem[m++] = (a << 4) + b; // write two nibbles
+                get_two_registers(buf, f, &a, &b);
+                c.mem[m++] = (a << 4) + b;
                 printf("andq %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "xorq")) { 
                 c.mem[m++] = (char) (6 << 4) + 3;
-                get_tok(buf, f); // should be a "ra,"
-                buf[strlen(buf) - 1] = '\0'; // remove trailing','
-                a = get_reg(buf);
-                get_tok(buf, f); // should be a "rb"
-                b = get_reg(buf);
-                c.mem[m++] = (a << 4) + b; // write two nibbles
+                get_two_registers(buf, f, &a, &b);
+                c.mem[m++] = (a << 4) + b;
                 printf("xorq %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "jmp")) {
                 c.mem[m++] = (char) (7 << 4) + 0;
-                get_tok(buf, f);
-                if (resolve_label(buf) >= 0) num = resolve_label(buf);
-                else if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
-                else num = strtol(buf, NULL, 10);
+                get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
                 printf("jmp %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "jle")) {
                 c.mem[m++] = (char) (7 << 4) + 1;
-                get_tok(buf, f);
-                if (resolve_label(buf) >= 0) num = resolve_label(buf);
-                else if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
-                else num = strtol(buf, NULL, 10);
+                get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
                 printf("jle %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "jl")) {
                 c.mem[m++] = (char) (7 << 4) + 2;
-                get_tok(buf, f);
-                if (resolve_label(buf) >= 0) num = resolve_label(buf);
-                else if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
-                else num = strtol(buf, NULL, 10);
+                get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
                 printf("jl %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "je")) {
                 c.mem[m++] = (char) (7 << 4) + 3;
-                get_tok(buf, f);
-                if (resolve_label(buf) >= 0) num = resolve_label(buf);
-                else if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
-                else num = strtol(buf, NULL, 10);
+                get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
                 printf("je %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "jne")) {
                 c.mem[m++] = (char) (7 << 4) + 4;
-                get_tok(buf, f);
-                if (resolve_label(buf) >= 0) num = resolve_label(buf);
-                else if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
-                else num = strtol(buf, NULL, 10);
+                get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
                 printf("jne %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "jge")) {
                 c.mem[m++] = (char) (7 << 4) + 5;
-                get_tok(buf, f);
-                if (resolve_label(buf) >= 0) num = resolve_label(buf);
-                else if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
-                else num = strtol(buf, NULL, 10);
+                get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
                 printf("jge %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "jg")) {
                 c.mem[m++] = (char) (7 << 4) + 6;
-                get_tok(buf, f);
-                if (resolve_label(buf) >= 0) num = resolve_label(buf);
-                else if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
-                else num = strtol(buf, NULL, 10);
+                get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
                 printf("jg %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "cmovle")) {
                 c.mem[m++] = (char) (2 << 4) + 1;
-                get_tok(buf, f); // should be a "ra,"
-                buf[strlen(buf) - 1] = '\0'; // remove trailing','
-                a = get_reg(buf);
-                get_tok(buf, f); // should be a "rb"
-                b = get_reg(buf);
-                c.mem[m++] = (a << 4) + b; // write two nibbles
+                get_two_registers(buf, f, &a, &b);
+                c.mem[m++] = (a << 4) + b;
                 printf("cmovle %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "cmovl")) {
                 c.mem[m++] = (char) (2 << 4) + 2;
-                get_tok(buf, f); // should be a "ra,"
-                buf[strlen(buf) - 1] = '\0'; // remove trailing','
-                a = get_reg(buf);
-                get_tok(buf, f); // should be a "rb"
-                b = get_reg(buf);
-                c.mem[m++] = (a << 4) + b; // write two nibbles
+                get_two_registers(buf, f, &a, &b);
+                c.mem[m++] = (a << 4) + b;
                 printf("cmovl %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "cmove")) {
                 c.mem[m++] = (char) (2 << 4) + 3;
-                buf[strlen(buf) - 1] = '\0'; // remove trailing','
-                a = get_reg(buf);
-                get_tok(buf, f); // should be a "rb"
-                b = get_reg(buf);
-                c.mem[m++] = (a << 4) + b; // write two nibbles
+                get_two_registers(buf, f, &a, &b);
+                c.mem[m++] = (a << 4) + b;
                 printf("cmove %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "cmovne")) {
                 c.mem[m++] = (char) (2 << 4) + 4;
-                buf[strlen(buf) - 1] = '\0'; // remove trailing','
-                a = get_reg(buf);
-                get_tok(buf, f); // should be a "rb"
-                b = get_reg(buf);
-                c.mem[m++] = (a << 4) + b; // write two nibbles
+                get_two_registers(buf, f, &a, &b);
+                c.mem[m++] = (a << 4) + b;
                 printf("cmovne %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "cmovge")) {
                 c.mem[m++] = (char) (2 << 4) + 5;
-                buf[strlen(buf) - 1] = '\0'; // remove trailing','
-                a = get_reg(buf);
-                get_tok(buf, f); // should be a "rb"
-                b = get_reg(buf);
-                c.mem[m++] = (a << 4) + b; // write two nibbles
+                get_two_registers(buf, f, &a, &b);
+                c.mem[m++] = (a << 4) + b;
                 printf("cmovge %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "cmovg")) {
                 c.mem[m++] = (char) (2 << 4) + 6;
-                buf[strlen(buf) - 1] = '\0'; // remove trailing','
-                a = get_reg(buf);
-                get_tok(buf, f); // should be a "rb"
-                b = get_reg(buf);
-                c.mem[m++] = (a << 4) + b; // write two nibbles
+                get_two_registers(buf, f, &a, &b);
+                c.mem[m++] = (a << 4) + b;
                 printf("cmovg %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "call")) {
                 c.mem[m++] = (char) (8 << 4) + 0;
-                get_tok(buf, f);
-                if (resolve_label(buf) >= 0) num = resolve_label(buf);
-                else if (buf[0] == '0' && buf[1] == 'x') num = strtol(buf + 2, NULL, 16);
-                else num = strtol(buf, NULL, 10);
+                get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
                 printf("call %s # 0x%lx\n", buf, num);
@@ -418,14 +341,14 @@ int main(int argc, char **argv) {
                 c.mem[m++] = (char) (10 << 4) + 0;
                 get_tok(buf, f);
                 a = get_reg(buf);
-                c.mem[m++] = (a << 4) + 15; // write two nibbles
+                c.mem[m++] = (a << 4) + 15;
                 printf("pushq %s\n", get_reg_name(a));
             }
             else if (!strcmp(buf, "popq")) {
                 c.mem[m++] = (char) (11 << 4) + 0;
                 get_tok(buf, f);
                 a = get_reg(buf);
-                c.mem[m++] = (a << 4) + 15; // write two nibbles
+                c.mem[m++] = (a << 4) + 15;
                 printf("popq %s\n", get_reg_name(a));
             }
             
@@ -437,9 +360,190 @@ int main(int argc, char **argv) {
 
     // step 2 - execute instructions
 
-    for (i = 0; i < MEMSIZE; i++) {
+    printf("\n\nexecution:\n");
+
+    while (!c.stat) {
         
+        i++;
+
+        long temp = 0, im = 0, dest = 0;
+        unsigned char icode = ((c.mem[c.pc] >> 4) & 0xf);
+        unsigned char ifun = (c.mem[c.pc] & 0xf);
+        unsigned char ra = 0, rb = 0;
+
+        printf("0x%-4lx :  %x:%x \n", c.pc, icode, ifun);
+
+        c.pc++;
+
+        switch (icode) {
+            case 0: // halt
+                c.stat = HLT;
+                break;
+            case 1: // nop
+                break;
+            case 2: // rrmovq OR cmovxx
+                ra = ((c.mem[c.pc] >> 4) & 0xf);
+                rb = (c.mem[c.pc] & 0x0f);
+
+                if (ifun == 0) { // rrmovq
+                    c.regs[rb] = c.regs[ra];
+                }
+                else if (ifun == 1) { // cmovle
+                    if ((c.cc[SF] ^ c.cc[OF]) | c.cc[ZF]) {
+                        c.regs[rb] = c.regs[ra];
+                    }
+                }
+                else if (ifun == 2) { // cmovl
+                    if (c.cc[SF] ^ c.cc[OF]) {
+                        c.regs[rb] = c.regs[ra];
+                    }
+                }
+                else if (ifun == 3) { // cmove
+                    if (c.cc[ZF]) {
+                        c.regs[rb] = c.regs[ra];
+                    }
+                }
+                else if (ifun == 4) { // cmovne
+                    if (!c.cc[ZF]) {
+                        c.regs[rb] = c.regs[ra];
+                    }
+                }
+                else if (ifun == 5) { // cmovge
+                    if (!((c.cc[SF] ^ c.cc[OF]) | c.cc[ZF])) {
+                        c.regs[rb] = c.regs[ra];
+                    }
+                }
+                else if (ifun == 6) { // cmovg
+                    if (!(c.cc[SF] ^ c.cc[OF])) {
+                        c.regs[rb] = c.regs[ra];
+                    }
+                }
+                c.pc += 1;
+                break;
+            case 3: // irmovq
+                ra = ((c.mem[c.pc] >> 4) & 0xf);
+                rb = (c.mem[c.pc] & 0xf);
+                c.pc += 1;
+                memcpy(&c.regs[rb], &c.mem[c.pc], 8);
+                c.pc += 8;
+                break;
+            case 4: // rmmovq
+                ra = ((c.mem[c.pc] >> 4) & 0xf);
+                rb = (c.mem[c.pc] & 0xf);
+                c.pc += 1;
+                memcpy(&num, &c.mem[c.pc], 8); // copy displacement
+                c.pc += 8;
+                num += c.regs[rb]; // displacement + rb
+                memcpy(&c.mem[num], &c.regs[ra], 8); // set mem at num
+                break;
+            case 5: // mrmovq
+                ra = ((c.mem[c.pc] >> 4) & 0xf);
+                rb = (c.mem[c.pc] & 0xf);
+                c.pc += 1;
+                memcpy(&num, &c.mem[c.pc], 8); // copy displacement
+                c.pc += 8;
+                num += c.regs[ra]; // displacement + rb
+                memcpy(&c.regs[rb], &c.mem[num], 8); // reg to *num
+                break;
+            case 6: // opq
+                ra = ((c.mem[c.pc] >> 4) & 0xf);
+                rb = (c.mem[c.pc] & 0xf);
+                temp = c.regs[rb];
+                
+                for (i = 0; i < 3; i++) { c.cc[i] = 0; }
+
+                if (ifun == 0) { // addq
+                    c.regs[rb] += c.regs[ra];
+                    if ((c.regs[ra] < 0 && temp < 0 && c.regs[rb] >= 0) || (c.regs[ra] > 0 && temp > 0 && c.regs[rb] <= 0)) c.cc[OF] = 1;
+                }
+                else if (ifun == 1) { // subq
+                    c.regs[rb] -= c.regs[ra];
+                    if ((c.regs[ra] < 0 && temp < 0 && c.regs[rb] >= 0) || (c.regs[ra] > 0 && temp > 0 && c.regs[rb] <= 0)) c.cc[OF] = 1;
+                }
+                else if (ifun == 2) { // andq
+                    c.regs[rb] &= c.regs[ra];
+                }
+                else if (ifun == 3) { // xorq
+                    c.regs[rb] ^= c.regs[ra];
+                }
+                if (c.regs[rb] == 0) c.cc[ZF] = 1;
+                if (c.regs[rb] < 0)  c.cc[SF] = 1;
+                c.pc += 1;
+                break;
+            case 7: // jxx
+                if (ifun == 0) { // jmp
+                    memcpy(&c.pc, &c.mem[c.pc], 8);
+                    break;
+                }
+                else if (ifun == 1) { // jle
+                    if ((c.cc[SF] ^ c.cc[OF]) | c.cc[ZF]) {
+                        memcpy(&c.pc, &c.mem[c.pc], 8);
+                        break;
+                    }
+                }
+                else if (ifun == 2) { // jl
+                    if (c.cc[SF] ^ c.cc[OF]) {
+                        memcpy(&c.pc, &c.mem[c.pc], 8);
+                        break;
+                    }
+                }
+                else if (ifun == 3) { // je
+                    if (c.cc[ZF]) {
+                        memcpy(&c.pc, &c.mem[c.pc], 8);
+                        break;
+                    }
+                }
+                else if (ifun == 4) { // jne
+                    if (!c.cc[ZF]) {
+                        memcpy(&c.pc, &c.mem[c.pc], 8);
+                        break;
+                    }
+                }
+                else if (ifun == 5) { // jge
+                    if (!((c.cc[SF] ^ c.cc[OF]) | c.cc[ZF])) {
+                        memcpy(&c.pc, &c.mem[c.pc], 8);
+                        break;
+                    }
+                }
+                else if (ifun == 6) { // jg
+                    if (!(c.cc[SF] ^ c.cc[OF])) {
+                        memcpy(&c.pc, &c.mem[c.pc], 8);
+                        break;
+                    }
+                }
+                c.pc += 8;
+                break;
+            case 8: // call
+                memcpy(&temp, &c.mem[c.pc], 8);
+                c.pc += 8;
+                c.regs[rsp] -= 8;
+                memcpy(&c.mem[c.regs[rsp]], &c.pc, 8);
+                c.pc = temp;
+                break;
+            case 9: // ret
+                memcpy(&c.pc, &c.mem[c.regs[rsp]], 8);
+                c.regs[rsp] += 8;
+                break;
+            case 10: // pushq
+                ra = (c.mem[c.pc] >> 4) & 0xf;
+                c.pc += 1;
+                c.regs[rsp] -= 8;
+                memcpy(&c.mem[c.regs[rsp]], &c.regs[ra], 8);
+                break;
+            case 11: // popq
+                ra = (c.mem[c.pc] >> 4) & 0xf;
+                c.pc += 1;
+                memcpy(&c.regs[ra], &c.mem[c.regs[rsp]], 8);
+                c.regs[rsp] += 8;
+                break;
+            default:
+                printf("error\n");
+                break;
+        }
     }
+    /*
+
+    */
 
     print_cpu(&c);
 

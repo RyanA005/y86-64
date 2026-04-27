@@ -3,18 +3,20 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-#define MEMSIZE 2048
+#define MEMSIZE 8192 
 
 // data stuctures
 
 enum reg { rax, rcx, rdx, rbx, rsp, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, garb };
+enum cc { ZF, SF, OF };
+enum stat { AOK, HLT, IST, ADR };
 
 typedef struct {
-    char mem[MEMSIZE];
     long regs[16];
     long pc;
-    char cc[4];
-    char stat;
+    unsigned char mem[MEMSIZE];
+    unsigned char cc[3];
+    unsigned char stat;
 } cpu;
 
 
@@ -31,10 +33,10 @@ label_table *head;
 void init_cpu(cpu *c) { // init entire CPU to 0
     for(int i = 0; i < MEMSIZE; i++ ) c->mem[i] = 0;
     for(int i = 0; i < 16; i++ ) c->regs[i] = 0;
-    for(int i = 0; i < 4; i++ ) c->cc[i] = 0;
+    for(int i = 0; i < 3; i++ ) c->cc[i] = 0;
     c->stat = 0;
     c->pc = 0;
-    c->regs[rsp] = 100;
+    c->regs[rsp] = 0;
 }
 
 enum reg get_reg(char *s) {
@@ -118,3 +120,29 @@ long resolve_label(char *name) {
         temp = temp->next;
     } return -1;
 }
+
+void get_value(char *buf, FILE *f, long *num) {
+    get_tok(buf, f); // will contain the number as a string or label
+    if (resolve_label(buf) >= 0) *num = resolve_label(buf);
+    else if (buf[0] == '0' && buf[1] == 'x') *num = strtol(buf + 2, NULL, 16);
+    else *num = strtol(buf, NULL, 10);
+}
+
+void get_first_register(char *buf, FILE *f, enum reg *r) {
+    get_tok(buf, f); // should be "r,"
+    buf[strlen(buf) - 1] = '\0'; // remove trailing','
+    *r = get_reg(buf);
+}
+void get_second_register(char *buf, FILE *f, enum reg *r) {
+    get_tok(buf, f); // should be "r"
+    *r = get_reg(buf);
+}
+
+void get_two_registers(char *buf, FILE *f, enum reg *a, enum reg *b) {
+    get_tok(buf, f); // should be a "ra,"
+    buf[strlen(buf) - 1] = '\0'; // remove trailing','
+    *a = get_reg(buf);
+    get_tok(buf, f); // should be a "rb"
+    *b = get_reg(buf);
+}
+
