@@ -92,15 +92,6 @@ int main(int argc, char **argv) {
     rewind(f);
     m = 0;
 
-    // print label table
-    label_table *temp = head;
-    printf("label table: \n");
-    while (temp) {
-        printf("%s : 0x%lx\n", temp->name, temp->location);
-        temp = temp->next;
-    }
-    printf("\n");
-
     // second pass to write bytes
 
     while ((ch = fgetc(f)) != EOF) { // read char by char
@@ -114,42 +105,40 @@ int main(int argc, char **argv) {
             }
             if (i == 0) continue; // comment or empty line
 
-            printf("0x%-4lx : ", m);
-
             // pseudo ops
             if(!strcmp(buf, ".pos")) {
                 get_value(buf, f, &num);
                 m = num; // literally move pointer to where we write next bytes
-                printf(".pos %s # %lx\n", buf, num);
+                // printf(".pos %s # %lx\n", buf, num);
             }
             if(!strcmp(buf, ".align")) {
                 get_value(buf, f, &num);
                 while(m % num != 0) m++; // increment until multiple of num
-                printf(".align %lx\n", num);
+                // printf(".align %lx\n", num);
             }
             if(!strcmp(buf, ".byte")) { // write 1 byte
                 get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 1);
                 m += 1;
-                printf(".byte %lx\n", num);
+                // printf(".byte %lx\n", num);
             }
             if(!strcmp(buf, ".word")) { // write 2
                 get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 2);
                 m += 2;
-                printf(".word %lx\n", num);
+                // printf(".word %lx\n", num);
             }
             if(!strcmp(buf, ".long")) { // write 4
                 get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 4);
                 m += 4;
-                printf(".long %lx\n", num);
+                // printf(".long %lx\n", num);
             }
             if(!strcmp(buf, ".quad")) { // write 8
                 get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
-                printf(".quad %lx\n", num);
+                // printf(".quad %lx\n", num);
             }
 
 
@@ -157,17 +146,17 @@ int main(int argc, char **argv) {
 
             if (!strcmp(buf, "halt")) { 
                 c.mem[m++] = (char) (0 << 4) + 0;
-                printf("halt\n");
+                // printf("halt\n");
             }
             else if (!strcmp(buf, "nop")) {
                 c.mem[m++] = (char) (1 << 4) + 0;
-                printf("nop\n");
+                // printf("nop\n");
             }
             else if (!strcmp(buf, "rrmovq")) { 
                 c.mem[m++] = (2 << 4) + 0;
                 get_two_registers(buf, f, &a, &b);
                 c.mem[m++] = (a << 4) + b;
-                printf("rrmovq %s, %s\n", get_reg_name(a), get_reg_name(b));
+                // printf("rrmovq %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "irmovq")) {
                 c.mem[m++] = (char) (3 << 4) + 0;
@@ -181,7 +170,7 @@ int main(int argc, char **argv) {
                 c.mem[m++] = (15 << 4) + b; // write two nibbles, first is 'f'
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
-                printf("irmovq 0x%lx, %s\n", num, get_reg_name(b));
+                // printf("irmovq 0x%lx, %s\n", num, get_reg_name(b));
             }
             else if (!strcmp(buf, "rmmovq")) { 
                 c.mem[m++] = (char) (4 << 4) + 0;
@@ -198,7 +187,7 @@ int main(int argc, char **argv) {
                 c.mem[m++] = (a << 4) + b;
                 memcpy(&c.mem[m], (unsigned char *)&off, 8);
                 m += 8;
-                printf("rmmovq %s, 0x%lx(%s)\n", get_reg_name(a), off, get_reg_name(b));
+                // printf("rmmovq %s, 0x%lx(%s)\n", get_reg_name(a), off, get_reg_name(b));
             }
             else if (!strcmp(buf, "mrmovq")) {
                 c.mem[m++] = (char) (5 << 4) + 0;
@@ -215,141 +204,141 @@ int main(int argc, char **argv) {
                 c.mem[m++] = (a << 4) + b;
                 memcpy(&c.mem[m], (unsigned char *)&off, 8);
                 m += 8;
-                printf("mrmovq 0x%lx(%s), %s\n", off, get_reg_name(a), get_reg_name(b));
+                // printf("mrmovq 0x%lx(%s), %s\n", off, get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "addq")) {
                 c.mem[m++] = (char) (6 << 4) + 0;
                 get_two_registers(buf, f, &a, &b);
                 c.mem[m++] = (a << 4) + b;
-                printf("addq %s, %s\n", get_reg_name(a), get_reg_name(b));
+                // printf("addq %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "subq")) { 
                 c.mem[m++] = (char) (6 << 4) + 1;
                 get_two_registers(buf, f, &a, &b);
                 c.mem[m++] = (a << 4) + b;
-                printf("subq %s, %s\n", get_reg_name(a), get_reg_name(b));
+                // printf("subq %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "andq")) {
                 c.mem[m++] = (char) (6 << 4) + 2;
                 get_two_registers(buf, f, &a, &b);
                 c.mem[m++] = (a << 4) + b;
-                printf("andq %s, %s\n", get_reg_name(a), get_reg_name(b));
+                // printf("andq %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "xorq")) { 
                 c.mem[m++] = (char) (6 << 4) + 3;
                 get_two_registers(buf, f, &a, &b);
                 c.mem[m++] = (a << 4) + b;
-                printf("xorq %s, %s\n", get_reg_name(a), get_reg_name(b));
+                // printf("xorq %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "jmp")) {
                 c.mem[m++] = (char) (7 << 4) + 0;
                 get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
-                printf("jmp %s # 0x%lx\n", buf, num);
+                // printf("jmp %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "jle")) {
                 c.mem[m++] = (char) (7 << 4) + 1;
                 get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
-                printf("jle %s # 0x%lx\n", buf, num);
+                // printf("jle %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "jl")) {
                 c.mem[m++] = (char) (7 << 4) + 2;
                 get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
-                printf("jl %s # 0x%lx\n", buf, num);
+                // printf("jl %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "je")) {
                 c.mem[m++] = (char) (7 << 4) + 3;
                 get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
-                printf("je %s # 0x%lx\n", buf, num);
+                // printf("je %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "jne")) {
                 c.mem[m++] = (char) (7 << 4) + 4;
                 get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
-                printf("jne %s # 0x%lx\n", buf, num);
+                // printf("jne %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "jge")) {
                 c.mem[m++] = (char) (7 << 4) + 5;
                 get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
-                printf("jge %s # 0x%lx\n", buf, num);
+                // printf("jge %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "jg")) {
                 c.mem[m++] = (char) (7 << 4) + 6;
                 get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
-                printf("jg %s # 0x%lx\n", buf, num);
+                // printf("jg %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "cmovle")) {
                 c.mem[m++] = (char) (2 << 4) + 1;
                 get_two_registers(buf, f, &a, &b);
                 c.mem[m++] = (a << 4) + b;
-                printf("cmovle %s, %s\n", get_reg_name(a), get_reg_name(b));
+                // printf("cmovle %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "cmovl")) {
                 c.mem[m++] = (char) (2 << 4) + 2;
                 get_two_registers(buf, f, &a, &b);
                 c.mem[m++] = (a << 4) + b;
-                printf("cmovl %s, %s\n", get_reg_name(a), get_reg_name(b));
+                // printf("cmovl %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "cmove")) {
                 c.mem[m++] = (char) (2 << 4) + 3;
                 get_two_registers(buf, f, &a, &b);
                 c.mem[m++] = (a << 4) + b;
-                printf("cmove %s, %s\n", get_reg_name(a), get_reg_name(b));
+                // printf("cmove %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "cmovne")) {
                 c.mem[m++] = (char) (2 << 4) + 4;
                 get_two_registers(buf, f, &a, &b);
                 c.mem[m++] = (a << 4) + b;
-                printf("cmovne %s, %s\n", get_reg_name(a), get_reg_name(b));
+                // printf("cmovne %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "cmovge")) {
                 c.mem[m++] = (char) (2 << 4) + 5;
                 get_two_registers(buf, f, &a, &b);
                 c.mem[m++] = (a << 4) + b;
-                printf("cmovge %s, %s\n", get_reg_name(a), get_reg_name(b));
+                // printf("cmovge %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "cmovg")) {
                 c.mem[m++] = (char) (2 << 4) + 6;
                 get_two_registers(buf, f, &a, &b);
                 c.mem[m++] = (a << 4) + b;
-                printf("cmovg %s, %s\n", get_reg_name(a), get_reg_name(b));
+                // printf("cmovg %s, %s\n", get_reg_name(a), get_reg_name(b));
             }
             else if (!strcmp(buf, "call")) {
                 c.mem[m++] = (char) (8 << 4) + 0;
                 get_value(buf, f, &num);
                 memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
-                printf("call %s # 0x%lx\n", buf, num);
+                // printf("call %s # 0x%lx\n", buf, num);
             }
             else if (!strcmp(buf, "ret")) {
                 c.mem[m++] = (char) (9 << 4) + 0;
-                printf("ret\n");
+                // printf("ret\n");
             }
             else if (!strcmp(buf, "pushq")) {
                 c.mem[m++] = (char) (10 << 4) + 0;
                 get_tok(buf, f);
                 a = get_reg(buf);
                 c.mem[m++] = (a << 4) + 15;
-                printf("pushq %s\n", get_reg_name(a));
+                // printf("pushq %s\n", get_reg_name(a));
             }
             else if (!strcmp(buf, "popq")) {
                 c.mem[m++] = (char) (11 << 4) + 0;
                 get_tok(buf, f);
                 a = get_reg(buf);
                 c.mem[m++] = (a << 4) + 15;
-                printf("popq %s\n", get_reg_name(a));
+                // printf("popq %s\n", get_reg_name(a));
             }
             
             i = 0, j = 0, num = 0, off = 0;
@@ -360,7 +349,7 @@ int main(int argc, char **argv) {
 
     // step 2 - execute instructions
 
-    printf("\n\nexecution:\n");
+    char stepping = 1;
 
     while (!c.stat) {
         
@@ -369,51 +358,92 @@ int main(int argc, char **argv) {
         long temp = 0, im = 0, dest = 0;
         unsigned char icode = ((c.mem[c.pc] >> 4) & 0xf);
         unsigned char ifun = (c.mem[c.pc] & 0xf);
-        unsigned char ra = 0, rb = 0;
-
-        printf("0x%-4lx :  %x:%x \n", c.pc, icode, ifun);
+        unsigned char ra = 0, rb = 0; 
 
         c.pc++;
+
+        char command[32];
+        while(stepping) {
+            printf("command : ");
+            scanf("%s", command);
+            if (!strcmp(command, "help")) {
+                printf("commands:\nstep\nrun\nregisters\nstack\nflags\nexit\n");
+            }
+            else if (!strcmp(command, "step")) {
+                break;
+            }
+            else if (!strcmp(command, "run")) {
+                stepping = 0;
+                break;
+            }
+            else if (!strcmp(command, "registers")) {
+                print_registers(&c);
+            }
+            else if (!strcmp(command, "stack")) {
+                print_stack(&c);
+            }
+            else if (!strcmp(command, "flags")) {
+                print_flags(&c);
+            }
+            else if (!strcmp(command, "exit")) {
+                printf("exiting...\n");
+                return 0;
+            }
+            else {
+                printf("unknown command\n");
+            }
+         }
+        
+        printf("0x%-4lx : ", c.pc - 1);
 
         switch (icode) {
             case 0: // halt
                 c.stat = HLT;
+                printf("halt\n");
                 break;
             case 1: // nop
+                printf("nop\n");
                 break;
             case 2: // rrmovq OR cmovxx
                 ra = ((c.mem[c.pc] >> 4) & 0xf);
                 rb = (c.mem[c.pc] & 0x0f);
 
                 if (ifun == 0) { // rrmovq
+                    printf("rrmovq %s, %s\n", get_reg_name(ra), get_reg_name(rb));
                     c.regs[rb] = c.regs[ra];
                 }
                 else if (ifun == 1) { // cmovle
+                    printf("cmovle %s, %s\n", get_reg_name(ra), get_reg_name(rb));
                     if ((c.cc[SF] ^ c.cc[OF]) | c.cc[ZF]) {
                         c.regs[rb] = c.regs[ra];
                     }
                 }
                 else if (ifun == 2) { // cmovl
+                    printf("cmovl %s, %s\n", get_reg_name(ra), get_reg_name(rb));
                     if (c.cc[SF] ^ c.cc[OF]) {
                         c.regs[rb] = c.regs[ra];
                     }
                 }
                 else if (ifun == 3) { // cmove
+                    printf("cmove %s, %s\n", get_reg_name(ra), get_reg_name(rb));
                     if (c.cc[ZF]) {
                         c.regs[rb] = c.regs[ra];
                     }
                 }
                 else if (ifun == 4) { // cmovne
+                    printf("cmovne %s, %s\n", get_reg_name(ra), get_reg_name(rb));
                     if (!c.cc[ZF]) {
                         c.regs[rb] = c.regs[ra];
                     }
                 }
                 else if (ifun == 5) { // cmovge
+                    printf("cmovge %s, %s\n", get_reg_name(ra), get_reg_name(rb));
                     if (!((c.cc[SF] ^ c.cc[OF]) | c.cc[ZF])) {
                         c.regs[rb] = c.regs[ra];
                     }
                 }
                 else if (ifun == 6) { // cmovg
+                    printf("cmovg %s, %s\n", get_reg_name(ra), get_reg_name(rb));
                     if (!(c.cc[SF] ^ c.cc[OF])) {
                         c.regs[rb] = c.regs[ra];
                     }
@@ -424,6 +454,7 @@ int main(int argc, char **argv) {
                 ra = ((c.mem[c.pc] >> 4) & 0xf);
                 rb = (c.mem[c.pc] & 0xf);
                 c.pc += 1;
+                printf("irmovq 0x%lx, %s\n", (long) c.mem[c.pc], get_reg_name(rb));
                 memcpy(&c.regs[rb], &c.mem[c.pc], 8);
                 c.pc += 8;
                 break;
@@ -433,6 +464,7 @@ int main(int argc, char **argv) {
                 c.pc += 1;
                 memcpy(&num, &c.mem[c.pc], 8); // copy displacement
                 c.pc += 8;
+                printf("rmmovq %s, 0x%lx(%s)\n", get_reg_name(ra), num, get_reg_name(rb));
                 num += c.regs[rb]; // displacement + rb
                 memcpy(&c.mem[num], &c.regs[ra], 8); // set mem at num
                 break;
@@ -442,6 +474,7 @@ int main(int argc, char **argv) {
                 c.pc += 1;
                 memcpy(&num, &c.mem[c.pc], 8); // copy displacement
                 c.pc += 8;
+                printf("mrmovq 0x%lx(%s), %s\n", num, get_reg_name(ra), get_reg_name(rb));
                 num += c.regs[ra]; // displacement + rb
                 memcpy(&c.regs[rb], &c.mem[num], 8); // reg to *num
                 break;
@@ -453,17 +486,21 @@ int main(int argc, char **argv) {
                 for (i = 0; i < 3; i++) { c.cc[i] = 0; }
 
                 if (ifun == 0) { // addq
+                    printf("addq %s, %s\n", get_reg_name(ra), get_reg_name(rb));
                     c.regs[rb] += c.regs[ra];
                     if ((c.regs[ra] < 0 && temp < 0 && c.regs[rb] >= 0) || (c.regs[ra] > 0 && temp > 0 && c.regs[rb] <= 0)) c.cc[OF] = 1;
                 }
                 else if (ifun == 1) { // subq
+                    printf("subq %s, %s\n", get_reg_name(ra), get_reg_name(rb));
                     c.regs[rb] -= c.regs[ra];
                     if ((c.regs[ra] < 0 && temp < 0 && c.regs[rb] >= 0) || (c.regs[ra] > 0 && temp > 0 && c.regs[rb] <= 0)) c.cc[OF] = 1;
                 }
                 else if (ifun == 2) { // andq
+                    printf("andq %s, %s\n", get_reg_name(ra), get_reg_name(rb));
                     c.regs[rb] &= c.regs[ra];
                 }
                 else if (ifun == 3) { // xorq
+                    printf("xorq %s, %s\n", get_reg_name(ra), get_reg_name(rb));
                     c.regs[rb] ^= c.regs[ra];
                 }
                 if (c.regs[rb] == 0) c.cc[ZF] = 1;
@@ -472,40 +509,47 @@ int main(int argc, char **argv) {
                 break;
             case 7: // jxx
                 if (ifun == 0) { // jmp
+                    printf("jmp %lx\n", c.pc);
                     memcpy(&c.pc, &c.mem[c.pc], 8);
                     break;
                 }
                 else if (ifun == 1) { // jle
+                    printf("jle %lx\n", c.pc);
                     if ((c.cc[SF] ^ c.cc[OF]) | c.cc[ZF]) {
                         memcpy(&c.pc, &c.mem[c.pc], 8);
                         break;
                     }
                 }
                 else if (ifun == 2) { // jl
+                    printf("jl %lx\n", c.pc);
                     if (c.cc[SF] ^ c.cc[OF]) {
                         memcpy(&c.pc, &c.mem[c.pc], 8);
                         break;
                     }
                 }
                 else if (ifun == 3) { // je
+                    printf("je %lx\n", c.pc);
                     if (c.cc[ZF]) {
                         memcpy(&c.pc, &c.mem[c.pc], 8);
                         break;
                     }
                 }
                 else if (ifun == 4) { // jne
+                    printf("jne %lx\n", c.pc);
                     if (!c.cc[ZF]) {
                         memcpy(&c.pc, &c.mem[c.pc], 8);
                         break;
                     }
                 }
                 else if (ifun == 5) { // jge
+                    printf("jge %lx\n", c.pc);
                     if (!((c.cc[SF] ^ c.cc[OF]) | c.cc[ZF])) {
                         memcpy(&c.pc, &c.mem[c.pc], 8);
                         break;
                     }
                 }
                 else if (ifun == 6) { // jg
+                    printf("jg %lx\n", c.pc);
                     if (!(c.cc[SF] ^ c.cc[OF])) {
                         memcpy(&c.pc, &c.mem[c.pc], 8);
                         break;
@@ -514,6 +558,7 @@ int main(int argc, char **argv) {
                 c.pc += 8;
                 break;
             case 8: // call
+                printf("call 0x%lx\n", (long) c.mem[c.pc]);
                 memcpy(&temp, &c.mem[c.pc], 8);
                 c.pc += 8;
                 c.regs[rsp] -= 8;
@@ -521,16 +566,19 @@ int main(int argc, char **argv) {
                 c.pc = temp;
                 break;
             case 9: // ret
+                printf("ret\n");
                 memcpy(&c.pc, &c.mem[c.regs[rsp]], 8);
                 c.regs[rsp] += 8;
                 break;
             case 10: // pushq
+                printf("pushq %s\n", get_reg_name(ra));
                 ra = (c.mem[c.pc] >> 4) & 0xf;
                 c.pc += 1;
                 c.regs[rsp] -= 8;
                 memcpy(&c.mem[c.regs[rsp]], &c.regs[ra], 8);
                 break;
             case 11: // popq
+                printf("popq %s\n", get_reg_name(ra));
                 ra = (c.mem[c.pc] >> 4) & 0xf;
                 c.pc += 1;
                 memcpy(&c.regs[ra], &c.mem[c.regs[rsp]], 8);
@@ -545,7 +593,7 @@ int main(int argc, char **argv) {
 
     */
 
-    print_cpu(&c);
+    // print_cpu(&c);
 
     return 0;
 }

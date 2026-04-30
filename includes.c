@@ -77,26 +77,6 @@ char *get_reg_name(enum reg r) {
     else return "garb";
 }
 
-void print_cpu(cpu *c) {
-    printf("\npc : %lx\n\n", c->pc);
-    printf("registers:\n");
-    for (int i = 0; i < 4; i++) {
-        printf("%4s : %4lx", get_reg_name(i), c->regs[i]);
-        printf(" | %4s : %4lx", get_reg_name(i+4), c->regs[i+4]);
-        printf(" | %4s : %4lx", get_reg_name(i+8), c->regs[i+8]);
-        printf(" | %4s : %4lx\n", get_reg_name(i+12), c->regs[i+12]);
-    }
-    printf("\n[ZF : %x] [SF : %x] [OF : %x] [STAT : %x]\n", c->cc[0], c->cc[1], c->cc[2], c->stat);
-
-    printf("\nmemory up to rsp (%03lx):\n", c->regs[rsp]);
-    printf("000 :");
-    for (int i = 0; i < c->regs[rsp]; i++) {
-        printf(" %02x", (unsigned char) c->mem[i]);
-        if (!((i + 1) % 8)) printf("\n%03x :", i + 1);
-    }
-    printf("\n\n");
-}
-
 void get_tok(char *buf, FILE *f) {
     int i = 0; char ch;
     while ((ch = fgetc(f)) != ' ' && ch != '\n' && i < 32) buf[i++] = ch;
@@ -146,3 +126,24 @@ void get_two_registers(char *buf, FILE *f, enum reg *a, enum reg *b) {
     *b = get_reg(buf);
 }
 
+void print_registers(cpu *c) {
+    for (int i = 0; i < 4; i++) {
+        printf("%4s : %4lx", get_reg_name(i), c->regs[i]);
+        printf(" | %4s : %4lx", get_reg_name(i+4), c->regs[i+4]);
+        printf(" | %4s : %4lx", get_reg_name(i+8), c->regs[i+8]);
+        printf(" | %4s : %4lx\n", get_reg_name(i+12), c->regs[i+12]);
+    }
+}
+void print_stack(cpu *c) {
+    // this function relies on a label table entry called 'stack'
+    long start = resolve_label("stack");
+    for (int i = c->regs[rsp]; i < start; i++) {
+        printf(" %02x", (unsigned char) c->mem[i]);
+    }
+    printf("\n");
+
+}
+void print_flags(cpu *c) {
+    printf("[ZF : %x] [SF : %x] [OF : %x] [STAT : %x]\n", c->cc[0], c->cc[1], c->cc[2], c->stat);
+    printf("STAT : \n");
+}
