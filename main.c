@@ -185,7 +185,7 @@ int main(int argc, char **argv) {
                 buf[strlen(buf) - 1] = '\0'; // remove trailing')'
                 b = get_reg(buf+j+1);
                 c.mem[m++] = (a << 4) + b;
-                memcpy(&c.mem[m], (unsigned char *)&off, 8);
+                memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
                 // printf("rmmovq %s, 0x%lx(%s)\n", get_reg_name(a), off, get_reg_name(b));
             }
@@ -202,7 +202,7 @@ int main(int argc, char **argv) {
                 a = get_reg(buf+j+1);
                 get_second_register(buf, f, &b);
                 c.mem[m++] = (a << 4) + b;
-                memcpy(&c.mem[m], (unsigned char *)&off, 8);
+                memcpy(&c.mem[m], (unsigned char *)&num, 8);
                 m += 8;
                 // printf("mrmovq 0x%lx(%s), %s\n", off, get_reg_name(a), get_reg_name(b));
             }
@@ -438,13 +438,13 @@ int main(int argc, char **argv) {
                 }
                 else if (ifun == 5) { // cmovge
                     printf("cmovge %s, %s\n", get_reg_name(ra), get_reg_name(rb));
-                    if (!((c.cc[SF] ^ c.cc[OF]) | c.cc[ZF])) {
+                    if (!(c.cc[SF] ^ c.cc[OF])) {
                         c.regs[rb] = c.regs[ra];
                     }
                 }
                 else if (ifun == 6) { // cmovg
                     printf("cmovg %s, %s\n", get_reg_name(ra), get_reg_name(rb));
-                    if (!(c.cc[SF] ^ c.cc[OF])) {
+                    if (!((c.cc[SF] ^ c.cc[OF]) | c.cc[ZF])) {
                         c.regs[rb] = c.regs[ra];
                     }
                 }
@@ -454,8 +454,9 @@ int main(int argc, char **argv) {
                 ra = ((c.mem[c.pc] >> 4) & 0xf);
                 rb = (c.mem[c.pc] & 0xf);
                 c.pc += 1;
-                printf("irmovq 0x%lx, %s\n", (long) c.mem[c.pc], get_reg_name(rb));
-                memcpy(&c.regs[rb], &c.mem[c.pc], 8);
+                memcpy(&temp, &c.mem[c.pc], 8);
+                printf("irmovq 0x%lx, %s\n", temp, get_reg_name(rb));
+                c.regs[rb] = temp;
                 c.pc += 8;
                 break;
             case 4: // rmmovq
@@ -493,7 +494,7 @@ int main(int argc, char **argv) {
                 else if (ifun == 1) { // subq
                     printf("subq %s, %s\n", get_reg_name(ra), get_reg_name(rb));
                     c.regs[rb] -= c.regs[ra];
-                    if ((c.regs[ra] < 0 && temp < 0 && c.regs[rb] >= 0) || (c.regs[ra] > 0 && temp > 0 && c.regs[rb] <= 0)) c.cc[OF] = 1;
+                    if ((c.regs[ra] > 0 && temp < 0 && c.regs[rb] > 0) || (c.regs[ra] < 0 && temp > 0 && c.regs[rb] < 0)) c.cc[OF] = 1;
                 }
                 else if (ifun == 2) { // andq
                     printf("andq %s, %s\n", get_reg_name(ra), get_reg_name(rb));
@@ -543,14 +544,14 @@ int main(int argc, char **argv) {
                 }
                 else if (ifun == 5) { // jge
                     printf("jge %lx\n", c.pc);
-                    if (!((c.cc[SF] ^ c.cc[OF]) | c.cc[ZF])) {
+                    if (!(c.cc[SF] ^ c.cc[OF])) {
                         memcpy(&c.pc, &c.mem[c.pc], 8);
                         break;
                     }
                 }
                 else if (ifun == 6) { // jg
                     printf("jg %lx\n", c.pc);
-                    if (!(c.cc[SF] ^ c.cc[OF])) {
+                    if (!((c.cc[SF] ^ c.cc[OF]) | c.cc[ZF])) {
                         memcpy(&c.pc, &c.mem[c.pc], 8);
                         break;
                     }
@@ -558,8 +559,8 @@ int main(int argc, char **argv) {
                 c.pc += 8;
                 break;
             case 8: // call
-                printf("call 0x%lx\n", (long) c.mem[c.pc]);
                 memcpy(&temp, &c.mem[c.pc], 8);
+                printf("call 0x%lx\n", temp);
                 c.pc += 8;
                 c.regs[rsp] -= 8;
                 memcpy(&c.mem[c.regs[rsp]], &c.pc, 8);
@@ -571,15 +572,15 @@ int main(int argc, char **argv) {
                 c.regs[rsp] += 8;
                 break;
             case 10: // pushq
-                printf("pushq %s\n", get_reg_name(ra));
                 ra = (c.mem[c.pc] >> 4) & 0xf;
+                printf("pushq %s\n", get_reg_name(ra));
                 c.pc += 1;
                 c.regs[rsp] -= 8;
                 memcpy(&c.mem[c.regs[rsp]], &c.regs[ra], 8);
                 break;
             case 11: // popq
-                printf("popq %s\n", get_reg_name(ra));
                 ra = (c.mem[c.pc] >> 4) & 0xf;
+                printf("popq %s\n", get_reg_name(ra));
                 c.pc += 1;
                 memcpy(&c.regs[ra], &c.mem[c.regs[rsp]], 8);
                 c.regs[rsp] += 8;
