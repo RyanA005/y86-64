@@ -138,6 +138,7 @@ void print_stack(cpu *c) {
     // this function relies on a label table entry called 'stack'
     long start = resolve_label("stack");
     for (int i = c->regs[rsp]; i < start; i++) {
+        if (i % 8 == 0) printf("\n0x%-4x : ", i);
         printf(" %02x", (unsigned char) c->mem[i]);
     }
     printf("\n");
@@ -145,5 +146,19 @@ void print_stack(cpu *c) {
 }
 void print_flags(cpu *c) {
     printf("[ZF : %x] [SF : %x] [OF : %x] [STAT : %x]\n", c->cc[0], c->cc[1], c->cc[2], c->stat);
-    printf("STAT : \n");
+    printf("STAT : [ %x ]\n", 1);
+}
+
+
+void print_cpu(cpu *c) {
+    printf("\n----registers----\n");
+    print_registers(c);
+    printf("\n------flags------\n");
+    print_flags(c);
+    printf("\n-------mem-------");
+    for (int i = 0; i < resolve_label("stack"); i++) {
+        if (i % 8 == 0) printf("\n0x%-4x : ", i);
+        printf(" %02x", (unsigned char) c->mem[i]);
+    }
+    printf("\n");
 }

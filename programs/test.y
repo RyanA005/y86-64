@@ -1,6 +1,6 @@
 # entry point
 .pos 0
-    irmovq $0x300, %rsp     # initialize stack pointer fix to use label later
+    irmovq stack, %rsp     # initialize stack pointer fix to use label later
     call main
     halt
 

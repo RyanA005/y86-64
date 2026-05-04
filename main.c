@@ -568,7 +568,8 @@ int main(int argc, char **argv) {
                 break;
             case 9: // ret
                 printf("ret\n");
-                memcpy(&c.pc, &c.mem[c.regs[rsp]], 8);
+                memcpy(&temp, &c.mem[c.regs[rsp]], 8);
+                c.pc = temp;
                 c.regs[rsp] += 8;
                 break;
             case 10: // pushq
@@ -590,11 +591,8 @@ int main(int argc, char **argv) {
                 break;
         }
     }
-    /*
 
-    */
-
-    // print_cpu(&c);
+    print_cpu(&c);
 
     return 0;
 }
